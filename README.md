@@ -1,6 +1,6 @@
 # Liquid Glass WebGL
 
-![Liquid Glass WebGL](演示/QQ20260826-232140-HD.gif)
+<img src="演示/QQ20260826-232140-HD.gif" width="50%" alt="Liquid Glass WebGL">
 
 **WebGL liquid glass effects for the browser.** This project ports the visual ideas and shader pipeline of the original Android/Compose Multiplatform liquid glass project [`Kyant0/AndroidLiquidGlass`](https://github.com/Kyant0/AndroidLiquidGlass) to the frontend. It is an independent web implementation, not an official web package from the original author.
 
@@ -25,19 +25,19 @@
 
 ### Liquid buttons | 液态按钮
 
-![Liquid button demo](演示/QQ20260826-231959-HD.gif)
+<img src="演示/QQ20260826-231959-HD.gif" width="50%" alt="Liquid button demo">
 
 ### Liquid toggle | 液态开关
 
-![Liquid toggle demo](演示/QQ20260826-232035-HD.gif)
+<img src="演示/QQ20260826-232035-HD.gif" width="50%" alt="Liquid toggle demo">
 
 ### Liquid slider | 液态滑块
 
-![Liquid slider demo](演示/QQ20260826-232108-HD.gif)
+<img src="演示/QQ20260826-232108-HD.gif" width="50%" alt="Liquid slider demo">
 
 ### Liquid bottom tabs | 液态底部标签栏
 
-![Liquid bottom tabs demo](演示/QQ20260826-232140-HD.gif)
+<img src="演示/QQ20260826-232140-HD.gif" width="50%" alt="Liquid bottom tabs demo">
 
 ## Quick Start | 快速开始
 
