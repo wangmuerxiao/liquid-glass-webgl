@@ -1,6 +1,6 @@
 # Liquid Glass WebGL
 
-![Liquid Glass WebGL](演示/QQ20260826-231959-HD.gif)
+![Liquid Glass WebGL](演示/QQ20260826-232140-HD.gif)
 
 **WebGL liquid glass effects for the browser.** This project ports the visual ideas and shader pipeline of the original Android/Compose Multiplatform liquid glass project [`Kyant0/AndroidLiquidGlass`](https://github.com/Kyant0/AndroidLiquidGlass) to the frontend. It is an independent web implementation, not an official web package from the original author.
 
