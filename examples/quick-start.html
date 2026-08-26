@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>液态玻璃 · 快速上手</title>
+  <!-- ① 引入样式表 -->
+  <link rel="stylesheet" href="../lib/liquid-glass.css">
+  <style>
+    /* 演示页面布局，与库无关 */
+    .stage {
+      position: fixed; inset: 0; overflow: hidden;
+      background: linear-gradient(135deg, #6ec1e4 0%, #b39ddb 50%, #ff8a80 100%);
+    }
+    .wallpaper {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; user-select: none; -webkit-user-drag: none;
+    }
+    .page { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 24px;
+            align-items: center; justify-content: center; }
+    .row { display: flex; gap: 24px; align-items: center; }
+    .slider-wrap { width: 260px; }
+    .hint { color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,0.4); margin-top: 32px; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <!-- 壁纸：玻璃会折射它 -->
+    <img class="wallpaper" src="../assets/wallpaper_light.webp" alt="" id="bg">
+
+    <div class="page">
+      <div class="row" id="btnRow"></div>
+      <div class="row" id="toggleRow"></div>
+      <div class="row slider-wrap" id="sliderRow"></div>
+      <div class="hint">长按 / 拖拽每个控件，观察折射与按压形变</div>
+    </div>
+  </div>
+
+  <!-- ② 引入库（单文件即包含 GLU / Spring / GlassElement / Components） -->
+  <script src="../lib/liquid-glass.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      // ③ 解构出要用的部分
+      var LG = window.LiquidGlass;
+      var BackdropSource = LG.BackdropSource;
+      var GlassElement = LG.GlassElement;
+      var C = LG.Components;
+
+      // ④ 创建共享的"背景源"。所有玻璃元素通过它采样壁纸。
+      var backdrop = new BackdropSource();
+      var img = document.getElementById('bg');
+      if (img.complete && img.naturalWidth > 0) {
+        backdrop.setImage(img);
+      } else {
+        img.addEventListener('load', function () { backdrop.setImage(img); });
+      }
+
+      // ⑤ 检测 WebGL 不可用 → 加降级类
+      try {
+        var t = document.createElement('canvas').getContext('webgl');
+        if (!t) document.documentElement.classList.add('no-webgl');
+      } catch (e) {
+        document.documentElement.classList.add('no-webgl');
+      }
+
+      // ---------- 液态按钮 ----------
+      function mkButton(text, opts) {
+        var span = document.createElement('span');
+        span.textContent = text;
+        span.style.cssText = 'font-size:15px;';
+        var b = C.createLiquidButton(Object.assign({ backdrop: backdrop, content: span }, opts || {}));
+        return b;
+      }
+      document.getElementById('btnRow').appendChild(
+        mkButton('透明按钮', null)
+      );
+      document.getElementById('btnRow').appendChild(
+        mkButton('蓝色按钮', { tint: [0, 0x88 / 255, 1, 0.8] })
+      );
+      // 改一下蓝按钮的文字颜色
+      var blueBtn = document.getElementById('btnRow').children[1];
+      blueBtn.querySelector('span').style.color = '#fff';
+
+      // ---------- 液态开关 ----------
+      var selected = false;
+      var toggle = C.createLiquidToggle({
+        backdrop: backdrop,
+        selected: function () { return selected; },
+        onSelect: function (v) { selected = v; }
+      });
+      document.getElementById('toggleRow').appendChild(toggle);
+
+      // ---------- 液态滑块 ----------
+      var value = 50;
+      var slider = C.createLiquidSlider({
+        backdrop: backdrop,
+        value: function () { return value; },
+        onValueChange: function (v) { value = v; },
+        valueRange: [0, 100],
+        visibilityThreshold: 0.01
+      });
+      document.getElementById('sliderRow').appendChild(slider);
+
+      // ---------- 也可以直接用 GlassElement 把任意 div 变成玻璃 ----------
+      // 例如给页面加一块"毛玻璃面板"：
+      var panel = document.createElement('div');
+      panel.style.cssText = 'position:absolute;left:24px;bottom:24px;width:200px;height:80px;border-radius:24px;';
+      var panelGlass = new GlassElement(backdrop, { radii: [24, 24, 24, 24], shadowPad: 16 });
+      panel.appendChild(panelGlass.canvas);
+      var label = document.createElement('div');
+      label.textContent = '自定义玻璃面板';
+      label.style.cssText = 'position:relative;z-index:2;padding:16px;color:#000;font-size:14px;';
+      panel.appendChild(label);
+      document.querySelector('.stage').appendChild(panel);
+      requestAnimationFrame(function () {
+        panelGlass.setSize(panel.clientWidth, panel.clientHeight);
+        panelGlass.render({
+          vibrancy: true,
+          blurRadius: 6,
+          refractionHeight: 14,
+          refractionAmount: 24,
+          surfaceColor: [1, 1, 1, 0.1],
+          highlight: { style: 'default', width: 0.5, blurRadius: 0.25, alpha: 1, angle: 45, falloff: 1 },
+          shadow: { radius: 12, offsetX: 0, offsetY: 4, color: [0, 0, 0, 0.12], alpha: 1 }
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

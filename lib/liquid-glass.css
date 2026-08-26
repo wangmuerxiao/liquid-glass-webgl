@@ -1,0 +1,226 @@
+/* ============================================================
+ * Liquid Glass Web Library - Component Styles v1.0.0
+ * 必须引入的样式表，定义玻璃画布、降级方案与各组件布局。
+ * 用法：<link rel="stylesheet" href="lib/liquid-glass.css">
+ * ============================================================ */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  font-family: "Roboto", "HarmonyOS Sans SC", -apple-system, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- 玻璃画布：每个玻璃元素都会插入一个绝对定位的 <canvas> ---- */
+.liquid-glass-canvas {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* 降级：WebGL 不可用时自动启用 CSS 毛玻璃（胶囊形）。
+ * 页面会在检测到无 WebGL 时给 <html> 加 .no-webgl 类。 */
+.no-webgl .liquid-btn,
+.no-webgl .liquid-toggle-thumb,
+.no-webgl .liquid-slider-thumb,
+.no-webgl .liquid-tabs-pill,
+.no-webgl .liquid-tabs {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.no-webgl .liquid-btn { border-radius: 999px; overflow: hidden; }
+.no-webgl .liquid-toggle-thumb { border-radius: 999px; }
+.no-webgl .liquid-slider-thumb { border-radius: 999px; }
+.no-webgl .liquid-tabs { border-radius: 999px; overflow: hidden; }
+.no-webgl .liquid-tabs-pill { border-radius: 999px; }
+
+/* ---- 按压高光叠层（InteractiveHighlight）---- */
+.interactive-highlight {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ---- 玻璃元素内容层（图标/文字放这里，浮在玻璃之上）---- */
+.liquid-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+/* ============================================================
+ * LiquidButton
+ * 胶囊形按钮，默认高度 48dp。
+ * ============================================================ */
+.liquid-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 16px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  will-change: transform;
+}
+
+/* ============================================================
+ * LiquidToggle
+ * 64×28 轨道 + 40×24 拇指滑块。
+ * ============================================================ */
+.liquid-toggle {
+  position: relative;
+  width: 64px;
+  height: 28px;
+}
+.liquid-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(120, 120, 120, 0.2);
+  cursor: pointer;
+}
+.liquid-toggle-thumb {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 40px;
+  height: 24px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+/* ============================================================
+ * LiquidSlider
+ * 全宽轨道 + 40×24 拇指滑块。
+ * ============================================================ */
+.liquid-slider {
+  position: relative;
+  width: 100%;
+  height: 24px;
+}
+.liquid-slider-track,
+.liquid-slider-accent {
+  position: absolute;
+  left: 0;
+  top: 9px;
+  height: 6px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+.liquid-slider-track {
+  width: 100%;
+  background: rgba(120, 120, 120, 0.2);
+}
+.liquid-slider-accent {
+  width: 50%;
+  background: #0088ff;
+}
+.liquid-slider-thumb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 24px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+/* ============================================================
+ * LiquidBottomTabs
+ * 高度 64dp 底部标签栏，内含毛玻璃容器 + 滑动胶囊指示器。
+ * ============================================================ */
+.liquid-tabs {
+  position: relative;
+  height: 64px;
+  margin: 0 36px;
+}
+.liquid-tabs-row {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  z-index: 2;
+}
+.liquid-tab {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+}
+.liquid-tab span {
+  font-size: 12px;
+  color: #000;
+}
+.liquid-tabs-pill {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  height: 56px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  z-index: 4;
+  will-change: transform;
+}
+
+/* ============================================================
+ * 可选：滚动容器卡片样式（用于 createScrollGlassCards）
+ * ============================================================ */
+.scroll-page {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.scroll-inner {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.scroll-card {
+  position: relative;
+  height: 160px;
+  flex: none;
+}
+.glass-fallback {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border-radius: 32px;
+}

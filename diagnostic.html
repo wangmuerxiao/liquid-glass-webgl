@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>折射诊断</title>
+  <link rel="stylesheet" href="css/style.css?v=3">
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  window.requestAnimationFrame = function(cb){ return setTimeout(function(){ cb(performance.now()); }, 16); };
+  window.cancelAnimationFrame = function(id){ clearTimeout(id); };
+  </script>
+  <script src="js/gl.js?v=3"></script>
+  <script src="js/spring.js"></script>
+  <script src="js/liquid-glass.js?v=3"></script>
+  <script src="js/components.js?v=10"></script>
+  <script src="js/pages.js?v=3"></script>
+  <script src="js/app.js?v=3"></script>
+  <script>
+  (function () {
+    // 诊断壁纸：编号横条 + 25% 洋红竖线 + 50% 黄横线 + 左上→右下白斜线
+    const wc = document.createElement('canvas');
+    wc.width = 1179; wc.height = 2556;
+    const wctx = wc.getContext('2d');
+    for (let i = 0; i < 10; i++) {
+      wctx.fillStyle = 'hsl(' + (i * 36) + ', 70%, ' + (35 + i * 4) + '%)';
+      wctx.fillRect(0, i * 255.6, 1179, 255.6);
+      wctx.fillStyle = '#fff';
+      wctx.font = 'bold 120px sans-serif';
+      wctx.textAlign = 'center';
+      wctx.fillText(String(i + 1), 589, i * 255.6 + 160);
+    }
+    wctx.strokeStyle = '#fff'; wctx.lineWidth = 6;
+    wctx.beginPath(); wctx.moveTo(0, 0); wctx.lineTo(1179, 2556); wctx.stroke();
+    wctx.fillStyle = '#ff00ff';
+    wctx.fillRect(1179 * 0.25 - 8, 0, 16, 2556);
+    wctx.fillStyle = '#ffff00';
+    wctx.fillRect(0, 2556 * 0.5 - 8, 1179, 16);
+
+    const backdrop2 = new LiquidGlass.BackdropSource();
+    LiquidPages.setSharedBackdrop(backdrop2);
+    backdrop2.setImage(wc);
+    const wall = document.createElement('img');
+    wall.className = 'wallpaper';
+    wall.src = wc.toDataURL('image/png');
+    document.body.appendChild(wall);
+    const content = document.createElement('div');
+    content.className = 'page-content';
+    document.body.appendChild(content);
+    const wrap = document.createElement('div');
+    wrap.className = 'demo-tabs-wrap';
+    content.appendChild(wrap);
+    [3, 4].forEach(function (count) {
+      const tabs = LiquidComponents.createLiquidBottomTabs({
+        backdrop: backdrop2, tabsCount: count,
+        selectedTabIndex: function () { return 0; },
+        onTabSelected: function () {}
+      });
+      wrap.appendChild(tabs);
+    });
+    const tip = document.createElement('div');
+    tip.style.cssText = 'position:fixed;top:8px;left:8px;z-index:99;background:rgba(0,0,0,0.6);color:#fff;font:12px monospace;padding:6px 10px;border-radius:6px;';
+    tip.textContent = '诊断：洋红竖线应在 25%（左 1/4 处）。若玻璃内洋红线出现在 75%（右 3/4），则为水平镜像；若编号上下颠倒则为垂直镜像。请截图并注明窗口尺寸与系统缩放。';
+    document.body.appendChild(tip);
+  })();
+  </script>
+</body>
+</html>

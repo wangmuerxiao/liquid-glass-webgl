@@ -1,0 +1,521 @@
+/* Liquid Glass web port - styles (1dp = 1px) */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  font-family: "Roboto", "HarmonyOS Sans SC", -apple-system, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app { width: 100%; height: 100%; }
+
+/* ---- demo scaffold ---- */
+.scaffold {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+.wallpaper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.page-content {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---- glass canvases ---- */
+.liquid-glass-canvas {
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+/* 降级：WebGL 不可用时显示 CSS 毛玻璃（胶囊形） */
+.no-webgl .liquid-btn,
+.no-webgl .liquid-toggle-thumb,
+.no-webgl .liquid-slider-thumb,
+.no-webgl .liquid-tabs-pill,
+.no-webgl .liquid-tabs {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(20px) saturate(1.5);
+  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.no-webgl .liquid-btn { border-radius: 999px; overflow: hidden; }
+.no-webgl .liquid-toggle-thumb { border-radius: 999px; }
+.no-webgl .liquid-slider-thumb { border-radius: 999px; }
+.no-webgl .liquid-tabs { border-radius: 999px; overflow: hidden; }
+.no-webgl .liquid-tabs-pill { border-radius: 999px; }
+
+.interactive-highlight {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 3;
+}
+.liquid-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  white-space: nowrap;
+}
+
+/* ---- LiquidButton ---- */
+.liquid-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 16px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  will-change: transform;
+}
+
+/* ---- LiquidToggle ---- */
+.liquid-toggle {
+  position: relative;
+  width: 64px;
+  height: 28px;
+}
+.liquid-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(120, 120, 120, 0.2);
+  cursor: pointer;
+}
+.liquid-toggle-thumb {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 40px;
+  height: 24px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+/* ---- LiquidSlider ---- */
+.liquid-slider {
+  position: relative;
+  width: 100%;
+  height: 24px;
+}
+.liquid-slider-track,
+.liquid-slider-accent {
+  position: absolute;
+  left: 0;
+  top: 9px;
+  height: 6px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+.liquid-slider-track {
+  width: 100%;
+  background: rgba(120, 120, 120, 0.2);
+}
+.liquid-slider-accent {
+  width: 50%;
+  background: #0088ff;
+}
+.liquid-slider-thumb {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  height: 24px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  will-change: transform;
+}
+
+/* ---- LiquidBottomTabs ---- */
+.liquid-tabs {
+  position: relative;
+  height: 64px;
+  margin: 0 36px;
+}
+.liquid-tabs-row {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  z-index: 2;
+}
+.liquid-tab {
+  flex: 1;
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  user-select: none;
+}
+.liquid-tab span {
+  font-size: 12px;
+  color: #000;
+}
+.liquid-tabs-pill {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  height: 56px;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  z-index: 4;
+  will-change: transform;
+}
+
+/* ---- home page (liquid glass) ---- */
+.home-page {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 104px;
+}
+.home-hero {
+  position: relative;
+  margin: 40px 20px 24px;
+  border-radius: 32px;
+  min-height: 140px;
+}
+.home-hero-inner {
+  position: relative;
+  z-index: 2;
+  padding: 30px 24px 26px;
+}
+.home-hero-title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: #000;
+}
+.home-hero-subtitle {
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(0, 0, 0, 0.55);
+}
+.home-hero-meta {
+  margin-top: 20px;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 136, 255, 0.14);
+  color: #0088ff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.home-section {
+  position: relative;
+  margin: 0 16px 20px;
+  border-radius: 28px;
+}
+.home-section-inner {
+  position: relative;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 28px;
+}
+.home-section-label {
+  padding: 16px 20px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #0088ff;
+}
+.home-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 20px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.home-row + .home-row::before {
+  content: '';
+  position: absolute;
+  left: 66px;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.07);
+}
+.home-row:active { background: rgba(0, 0, 0, 0.05); }
+.home-row-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(0, 136, 255, 0.12);
+  color: #0088ff;
+}
+.home-row-label {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 500;
+  color: #000;
+}
+.home-row-chevron {
+  flex: none;
+  color: rgba(0, 0, 0, 0.25);
+  display: flex;
+}
+
+/* ---- demo pages layout ---- */
+.demo-column {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+.demo-box {
+  margin: 24px;
+  border-radius: 32px;
+  background: #fff;
+  padding: 24px;
+  width: calc(100% - 48px);
+}
+.demo-tabs-wrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 32px;
+}
+.pick-btn-wrap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 16px;
+  display: flex;
+  justify-content: center;
+  z-index: 10;
+}
+
+/* ---- lockscreen (SDF) ---- */
+.lockscreen { position: absolute; inset: 0; }
+.lockscreen-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.3); }
+.lockscreen-top {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lockscreen-clock {
+  position: relative;
+  width: calc(100% - 96px);
+  max-width: 400px;
+  cursor: grab;
+  touch-action: none;
+  will-change: transform;
+}
+.lockscreen-edit {
+  position: absolute;
+  left: 50%;
+  bottom: 84px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 11;
+}
+.lockscreen-input {
+  width: 180px;
+  height: 36px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  padding: 0 10px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.75);
+  outline: none;
+}
+.lockscreen-input:focus { border-color: #0088ff; }
+.lockscreen-apply {
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: #0088ff;
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ---- control center ---- */
+.cc-root { position: absolute; inset: 0; touch-action: none; overflow: hidden; }
+.cc-dim { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+.cc-col {
+  position: absolute;
+  left: 0; right: 0; top: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.cc-row { display: flex; gap: 16px; align-items: center; justify-content: center; }
+.cc-col2 { display: flex; flex-direction: column; gap: 16px; }
+.cc-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  will-change: transform, opacity;
+}
+.cc-tile > canvas { z-index: 0; }
+.cc-icon { position: relative; z-index: 2; display: flex; }
+.cc-pad { padding: 16px; }
+.cc-inner {
+  position: absolute;
+  width: 45px; height: 45px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.cc-inner svg { transform: scale(0.8); }
+.cc-inner-tl { top: 16px; left: 16px; }
+.cc-inner-tr { top: 16px; right: 16px; }
+.cc-inner-bl { bottom: 16px; left: 16px; }
+.cc-spacer { width: 100%; }
+
+/* ---- magnifier ---- */
+.mag-page { position: absolute; inset: 0; touch-action: none; }
+.mag-text { position: absolute; left: 24px; top: 24px; }
+.mag-cursor {
+  position: absolute;
+  left: 0; top: 0;
+  width: 4px; height: 24px;
+  will-change: transform;
+  z-index: 3;
+}
+.mag-cursor-blink { animation: mag-caret-blink 1.05s steps(1, end) infinite; }
+@keyframes mag-caret-blink {
+  0%, 46% { opacity: 1; }
+  47%, 76% { opacity: 0; }
+  77%, 100% { opacity: 1; }
+}
+.mag-cursor canvas { width: 4px; height: 24px; display: block; }
+.mag-lens { position: absolute; left: 0; top: 0; width: 128px; height: 96px; will-change: transform; z-index: 2; }
+
+/* ---- glass playground ---- */
+.pg-main {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  margin-left: -128px;
+  width: 256px; height: 256px;
+  touch-action: none;
+  will-change: transform;
+  z-index: 2;
+}
+.pg-sheet {
+  position: absolute;
+  left: 16px; right: 16px;
+  bottom: 88px;
+  padding: 24px;
+  z-index: 3;
+}
+.pg-sheet-inner { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 14px; }
+.pg-row { display: flex; flex-direction: column; gap: 4px; }
+.pg-label { font-size: 13px; color: #000; }
+.pg-buttons {
+  position: absolute;
+  left: 20px; right: 20px;
+  bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  z-index: 4;
+}
+
+/* ---- adaptive luminance ---- */
+.lum-stage { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.lum-glass { position: relative; width: 160px; height: 160px; touch-action: none; will-change: transform; }
+.lum-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 16px;
+  white-space: pre;
+  z-index: 2;
+  pointer-events: none;
+  color: #000;
+}
+
+/* ---- progressive blur ---- */
+.pb-wrap { position: absolute; top: 25%; left: 0; right: 0; height: 128px; }
+.pb-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font-size: 16px;
+  z-index: 2;
+}
+
+/* ---- scroll containers ---- */
+.scroll-page {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.scroll-inner { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.scroll-card { position: relative; height: 160px; flex: none; }
+.glass-fallback {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border-radius: 32px;
+}

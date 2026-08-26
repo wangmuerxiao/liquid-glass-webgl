@@ -1,0 +1,17 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+
+# Logs and local tooling
+*.log
+.cache/
+.vite/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+
+# Local editor settings
+.idea/
+.vscode/
