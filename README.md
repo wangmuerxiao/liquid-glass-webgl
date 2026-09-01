@@ -39,6 +39,12 @@
 
 <img src="演示/QQ20260826-235348-HD.gif" width="50%" alt="Liquid bottom tabs demo">
 
+## Changelog | 更新日志
+
+See [CHANGELOG.md](CHANGELOG.md) for notable user-facing changes.
+
+重要的用户可见改动请参阅 [CHANGELOG.md](CHANGELOG.md)。
+
 ## Quick Start | 快速开始
 
 ### 1. Include the library | 引入库
