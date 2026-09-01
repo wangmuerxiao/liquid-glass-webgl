@@ -454,53 +454,167 @@
 
   /* =================== Magnifier =================== */
   function renderMagnifier(content) {
-    const LOREM = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
+    const DEFAULT_TEXT = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
 
     const page = document.createElement('div');
     page.className = 'mag-page';
     content.appendChild(page);
 
-    let cardW = Math.max(280, Math.min(content.clientWidth - 48, 720));
-    let cardH = 0;
-    const textPad = 24;
-    const cardLeft = 24, cardTop = 24;
+    let cardW = 0, cardH = 0, cardLeft = 0, cardTop = 0;
+    const textPad = 28;
+    const TEXT_LINE_HEIGHT = 24;
+    const CARET_VISUAL_OFFSET_Y = -2;
+    const LINE_SWITCH_SLOP = 4;
+    let textValue = DEFAULT_TEXT;
     let textLines = [];
+    let caretStops = [];
+    let caretIndices = [];
+    let lineBreakTypes = [];
+    let scrollLine = 0;
+    let cardVersion = 0;
+    let editorFocused = false;
+    let editorSelectionStart = 0;
+    let editorSelectionEnd = 0;
+    let editorSelectionDirection = 'none';
+
+    // renderMagnifier is built before the scaffold is attached, so
+    // content.clientWidth is still zero here. Size from the viewport instead:
+    // the editor becomes the main surface while preserving room for the
+    // bottom image picker.
+    function updateCardGeometry() {
+      const vw = Math.max(320, window.innerWidth);
+      const vh = Math.max(480, window.innerHeight);
+      const sideMargin = clamp(vw * 0.05, 16, 40);
+      cardW = Math.max(280, Math.min(vw - sideMargin * 2, 960));
+      cardLeft = Math.round((vw - cardW) * 0.5);
+      cardTop = Math.round(clamp(vh * 0.045, 20, 36));
+      cardH = Math.max(280, Math.min(vh - cardTop - 112, 620));
+    }
+    updateCardGeometry();
+
     // text card rendered onto a canvas (also used as the lens backdrop layer)
     const card = document.createElement('canvas');
     card.className = 'mag-text';
     page.appendChild(card);
-    (function renderCard() {
+
+    function visibleLineCount() {
+      return Math.max(1, Math.floor((cardH - textPad * 2) / TEXT_LINE_HEIGHT));
+    }
+
+    function pushTextLine(ctx, start, end, breakType) {
+      const line = textValue.slice(start, end);
+      textLines.push(line);
+      lineBreakTypes.push(breakType);
+      const stops = [0];
+      const indices = [start];
+      for (let i = 1; i <= line.length; i++) {
+        stops.push(ctx.measureText(line.slice(0, i)).width);
+        indices.push(start + i);
+      }
+      caretStops.push(stops);
+      caretIndices.push(indices);
+    }
+
+    function layoutEditableText(ctx, maxW) {
+      textLines = [];
+      caretStops = [];
+      caretIndices = [];
+      lineBreakTypes = [];
+
+      let start = 0;
+      let i = 0;
+      let lastBreak = -1;
+      while (i < textValue.length) {
+        const ch = textValue[i];
+        if (ch === '\n') {
+          pushTextLine(ctx, start, i, 'hard');
+          i++;
+          start = i;
+          lastBreak = -1;
+          continue;
+        }
+        if (ch === ' ' || ch === '\t') lastBreak = i;
+        const width = ctx.measureText(textValue.slice(start, i + 1)).width;
+        if (width > maxW && i > start) {
+          const breakAt = lastBreak >= start ? lastBreak + 1 : i;
+          pushTextLine(ctx, start, breakAt, 'soft');
+          start = breakAt;
+          i = start;
+          lastBreak = -1;
+          continue;
+        }
+        i++;
+      }
+      pushTextLine(ctx, start, textValue.length, 'end');
+    }
+
+    function renderCard() {
       const ratio = dpr();
       const pad = textPad;
-      const ctx0 = card.getContext('2d');
-      ctx0.setTransform(ratio, 0, 0, ratio, 0, 0);
-      ctx0.font = '16px system-ui, sans-serif';
-      const maxW = cardW - pad * 2;
-      const words = LOREM.split(' ');
-      const lines = [];
-      let line = '';
-      for (const w of words) {
-        const t = line ? line + ' ' + w : w;
-        if (ctx0.measureText(t).width > maxW && line) { lines.push(line); line = w; }
-        else line = t;
-      }
-      if (line) lines.push(line);
-      textLines = lines;
-      cardH = lines.length * 24 + pad * 2;
       card.width = Math.round(cardW * ratio);
       card.height = Math.round(cardH * ratio);
       card.style.width = cardW + 'px';
       card.style.height = cardH + 'px';
+      card.style.left = cardLeft + 'px';
+      card.style.top = cardTop + 'px';
       const ctx = card.getContext('2d');
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      ctx.font = '16px system-ui, sans-serif';
+      layoutEditableText(ctx, cardW - pad * 2);
+      scrollLine = clamp(scrollLine, 0, Math.max(0, textLines.length - visibleLineCount()));
+
+      ctx.clearRect(0, 0, cardW, cardH);
       roundedRectPath(ctx, 0, 0, cardW, cardH, 32);
       ctx.fillStyle = 'rgba(255,255,255,0.9)';
       ctx.fill();
+      ctx.save();
+      roundedRectPath(ctx, 0, 0, cardW, cardH, 32);
+      ctx.clip();
+      if (editorFocused && editorSelectionEnd > editorSelectionStart) {
+        ctx.fillStyle = 'rgba(0,136,255,0.18)';
+        const visibleCount = visibleLineCount();
+        for (let i = scrollLine; i < Math.min(textLines.length, scrollLine + visibleCount); i++) {
+          const indices = caretIndices[i] || [0];
+          const lineStart = indices[0];
+          const lineEnd = indices[indices.length - 1];
+          const from = Math.max(editorSelectionStart, lineStart);
+          const to = Math.min(editorSelectionEnd, lineEnd);
+          if (to <= from) continue;
+          const stops = caretStops[i] || [0];
+          const x1 = pad + stops[clamp(from - lineStart, 0, stops.length - 1)];
+          const x2 = pad + stops[clamp(to - lineStart, 0, stops.length - 1)];
+          const y = pad + (i - scrollLine) * TEXT_LINE_HEIGHT;
+          ctx.fillRect(x1, y, Math.max(2, x2 - x1), TEXT_LINE_HEIGHT);
+        }
+      }
       ctx.fillStyle = '#000';
       ctx.font = '16px system-ui, sans-serif';
       ctx.textBaseline = 'top';
-      lines.forEach((ln, i) => ctx.fillText(ln, pad, pad + i * 24));
-    })();
+      const visibleCount = visibleLineCount();
+      for (let i = scrollLine; i < Math.min(textLines.length, scrollLine + visibleCount); i++) {
+        ctx.fillText(textLines[i], pad, pad + (i - scrollLine) * TEXT_LINE_HEIGHT);
+      }
+      ctx.restore();
+      if (editorFocused) {
+        roundedRectPath(ctx, 0.75, 0.75, cardW - 1.5, cardH - 1.5, 31.25);
+        ctx.strokeStyle = 'rgba(0,136,255,0.42)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+      cardVersion++;
+    }
+    renderCard();
+
+    // A real textarea owns editing semantics (IME, paste, undo, keyboard
+    // navigation); the canvas above is its visual mirror and the texture used
+    // by the magnifier. Keeping the native control visually hidden avoids a
+    // second caret while preserving full text input behavior.
+    const editor = document.createElement('textarea');
+    editor.className = 'mag-editor-input';
+    editor.value = textValue;
+    editor.setAttribute('aria-label', '可编辑的放大镜文本');
+    editor.spellcheck = true;
+    page.appendChild(editor);
 
     // cursor (4x24 accent capsule) as a canvas layer
     const cursorW = 4, cursorH = 24;
@@ -523,120 +637,439 @@
     const lensEl = document.createElement('div');
     lensEl.className = 'mag-lens';
     page.appendChild(lensEl);
-    const lensGlass = new GlassElement(backdropOf(), { radii: [1000, 1000, 1000, 1000], regionPad: 64 });
+    const LENS_W = 128, LENS_H = 96;
+    // Extra sampling room is intentional: the glass body trails the caret
+    // while it is being dragged, so the magnified focus can briefly sit
+    // outside the lens' untransformed bounds without exposing a hard edge.
+    // The shadow needs enough transparent canvas around the lens to finish
+    // fading. Without this pad its low-alpha tail is clipped to the 128x96
+    // canvas and becomes visible as a faint rectangular silhouette.
+    const lensGlass = new GlassElement(backdropOf(), {
+      radii: [1000, 1000, 1000, 1000],
+      regionPad: 128,
+      shadowPad: 40
+    });
     lensEl.appendChild(lensGlass.canvas);
-    lensGlass.setSize(128, 96);
+    lensGlass.setSize(LENS_W, LENS_H);
 
     const LENS_GAP = 16;
-    // Deliberately softer than the component press springs: a text caret
-    // should visibly ease toward its insertion point, then settle precisely
-    // rather than appearing to teleport there on every pointer move.
-    const cursorX = new SpringAnimatable(40, new Spring(0.68, 110, 0.01));
-    const cursorY = new SpringAnimatable(200, new Spring(0.70, 90, 0.01));
+    // Start on a real insertion point rather than at an arbitrary pixel.
+    const initialLineIndex = 0;
+    const initialCursorX = cardLeft + textPad - cursorW * 0.5;
+    const initialCursorY = cardTop + textPad + initialLineIndex * TEXT_LINE_HEIGHT + CARET_VISUAL_OFFSET_Y;
+    // The vertical spring settles slightly faster than the horizontal one.
+    // On a line change this moves onto the new row first, then glides toward
+    // the target character instead of cutting diagonally across the text.
+    const cursorX = new SpringAnimatable(initialCursorX, new Spring(0.86, 700, 0.01));
+    const cursorY = new SpringAnimatable(initialCursorY, new Spring(0.90, 900, 0.01));
+    const initialTextIndex = (caretIndices[initialLineIndex] || [0])[0] || 0;
+    editor.setSelectionRange(initialTextIndex, initialTextIndex);
 
-    // Finds a genuine text insertion point rather than leaving the cursor
-    // between glyphs. This mirrors the magnetic feel of native text handles.
-    function nearestCaret(pageX, pageY) {
-      const ctx = card.getContext('2d');
-      ctx.font = '16px system-ui, sans-serif';
-      const localY = pageY - cardTop - textPad;
-      const lineIndex = clamp(Math.round(localY / 24), 0, Math.max(0, textLines.length - 1));
-      const line = textLines[lineIndex] || '';
-      const localX = clamp(pageX - cardLeft - textPad, 0, ctx.measureText(line).width);
-      let charIndex = 0;
-      for (let i = 1; i <= line.length; i++) {
-        const before = ctx.measureText(line.slice(0, i - 1)).width;
-        const after = ctx.measureText(line.slice(0, i)).width;
-        if (localX < (before + after) * 0.5) break;
-        charIndex = i;
-      }
+    /* The caret is the precise interaction point; the glass body is a
+     * separate, under-damped mass that chases it.  Keeping these motions
+     * independent gives the lens real inertia instead of a canned scale
+     * keyframe.  The same velocity -> squash/stretch idea is used by the
+     * LiquidBottomTabs pill, extended here to both axes. */
+    const initialLensTarget = lensTargetForCaret(cursorX.value, cursorY.value);
+    const lensX = new SpringAnimatable(initialLensTarget.x, new Spring(0.56, 360, 0.02));
+    const lensY = new SpringAnimatable(initialLensTarget.y, new Spring(0.58, 360, 0.02));
+    const lensPress = new SpringAnimatable(0, new Spring(0.58, 320, 0.001));
+    const reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function lensTargetForCaret(x, y) {
+      const unclampedX = x + cursorW * 0.5 - LENS_W * 0.5;
+      const above = y - LENS_GAP - LENS_H;
+      const below = y + cursorH + LENS_GAP;
+      const lensYTarget = above >= 8 ? above : below;
       return {
-        x: cardLeft + textPad + ctx.measureText(line.slice(0, charIndex)).width - cursorW * 0.5,
-        y: cardTop + textPad + lineIndex * 24
+        x: clamp(unclampedX, 8, Math.max(8, window.innerWidth - LENS_W - 8)),
+        y: clamp(lensYTarget, 8, Math.max(8, window.innerHeight - LENS_H - 8))
       };
     }
 
-    function moveCursorTo(pageX, pageY) {
-      const caret = nearestCaret(pageX, pageY);
+    function moveLensToCaret(x, y, immediate) {
+      const target = lensTargetForCaret(x, y);
+      if (immediate || reducedMotion) {
+        lensX.snapTo(target.x);
+        lensY.snapTo(target.y);
+      } else {
+        // animateTo preserves the body's current velocity, so rapid pointer
+        // reversals become a visible compression followed by elastic recoil.
+        lensX.animateTo(target.x);
+        lensY.animateTo(target.y);
+      }
+    }
+
+    // Native-style hit testing: the whole line box belongs to its line (not
+    // merely the half nearest its top), and a small hysteresis zone prevents
+    // a slightly low finger from accidentally switching to the next row.
+    function nearestCaret(pageX, pageY, lineHint) {
+      const localY = pageY - cardTop - textPad;
+      const contentY = localY + scrollLine * TEXT_LINE_HEIGHT;
+      const firstVisibleLine = scrollLine;
+      const lastVisibleLine = Math.min(
+        Math.max(0, textLines.length - 1),
+        scrollLine + visibleLineCount() - 1
+      );
+      let lineIndex;
+      if (lineHint == null) {
+        // Clicks use line boxes: only crossing the line's bottom edge selects
+        // the next line. Math.round() used to switch halfway down the row.
+        lineIndex = clamp(
+          Math.floor(contentY / TEXT_LINE_HEIGHT),
+          firstVisibleLine,
+          lastVisibleLine
+        );
+      } else {
+        lineIndex = clamp(lineHint, firstVisibleLine, lastVisibleLine);
+        while (lineIndex < lastVisibleLine &&
+               contentY >= (lineIndex + 1) * TEXT_LINE_HEIGHT + LINE_SWITCH_SLOP) lineIndex++;
+        while (lineIndex > firstVisibleLine &&
+               contentY < lineIndex * TEXT_LINE_HEIGHT - LINE_SWITCH_SLOP) lineIndex--;
+      }
+
+      const stops = caretStops[lineIndex] || [0];
+      const localX = clamp(pageX - cardLeft - textPad, 0, stops[stops.length - 1] || 0);
+      let low = 0, high = stops.length - 1;
+      while (low < high) {
+        const mid = Math.floor((low + high) / 2);
+        const boundary = (stops[mid] + stops[mid + 1]) * 0.5;
+        if (localX < boundary) high = mid;
+        else low = mid + 1;
+      }
+      return {
+        x: cardLeft + textPad + stops[low] - cursorW * 0.5,
+        y: cardTop + textPad + (lineIndex - scrollLine) * TEXT_LINE_HEIGHT + CARET_VISUAL_OFFSET_Y,
+        lineIndex,
+        charIndex: low,
+        textIndex: (caretIndices[lineIndex] || [0])[low] || 0
+      };
+    }
+
+    function caretForTextIndex(textIndex) {
+      const index = clamp(textIndex, 0, textValue.length);
+      let lineIndex = Math.max(0, textLines.length - 1);
+      for (let i = 0; i < textLines.length; i++) {
+        const indices = caretIndices[i] || [0];
+        const end = indices[indices.length - 1];
+        const selectsThisLine = index < end ||
+          (index === end && (lineBreakTypes[i] !== 'soft' || i === textLines.length - 1));
+        if (selectsThisLine) { lineIndex = i; break; }
+      }
+      const indices = caretIndices[lineIndex] || [0];
+      let charIndex = clamp(index - indices[0], 0, indices.length - 1);
+      // Defensive fallback for future layout variants with non-contiguous
+      // indices (for example CRLF normalization).
+      while (charIndex < indices.length - 1 && indices[charIndex] < index) charIndex++;
+      const stops = caretStops[lineIndex] || [0];
+      return {
+        x: cardLeft + textPad + stops[charIndex] - cursorW * 0.5,
+        y: cardTop + textPad + (lineIndex - scrollLine) * TEXT_LINE_HEIGHT + CARET_VISUAL_OFFSET_Y,
+        lineIndex,
+        charIndex,
+        textIndex: index
+      };
+    }
+
+    function ensureCaretVisible(lineIndex) {
+      const count = visibleLineCount();
+      const oldScrollLine = scrollLine;
+      if (lineIndex < scrollLine) scrollLine = lineIndex;
+      else if (lineIndex >= scrollLine + count) scrollLine = lineIndex - count + 1;
+      scrollLine = clamp(scrollLine, 0, Math.max(0, textLines.length - count));
+      if (scrollLine !== oldScrollLine) renderCard();
+      return scrollLine !== oldScrollLine;
+    }
+
+    function restartCaretBlink() {
       // A new placement restarts the caret blink, as native editors do.
       cursorEl.classList.remove('mag-cursor-blink');
       void cursorEl.offsetWidth;
       cursorEl.classList.add('mag-cursor-blink');
+    }
+
+    function settleCursorAt(caret) {
+      moveCursorVisualTo(caret);
+      moveLensToCaret(caret.x, caret.y, false);
+    }
+
+    function moveCursorVisualTo(caret) {
+      if (reducedMotion) {
+        cursorX.snapTo(caret.x);
+        cursorY.snapTo(caret.y);
+        restartCaretBlink();
+        return;
+      }
+      const changed = Math.abs(cursorX.targetValue - caret.x) > 0.01 ||
+        Math.abs(cursorY.targetValue - caret.y) > 0.01;
       cursorX.animateTo(caret.x);
       cursorY.animateTo(caret.y);
+      if (!changed && !cursorX.running && !cursorY.running) restartCaretBlink();
     }
 
-    // During a drag the caret stays directly below the finger/mouse.  On
-    // release it magnetically settles onto the nearest valid insertion point;
-    // this makes the non-linear alignment both visible and predictable.
-    function moveCursorFreely(pageX, pageY) {
-      const x = clamp(pageX - cursorW * 0.5,
-        cardLeft + textPad - cursorW * 0.5,
-        cardLeft + cardW - textPad - cursorW * 0.5);
-      const y = clamp(pageY - cursorH * 0.5,
-        cardTop + textPad,
-        cardTop + cardH - textPad - cursorH);
-      cursorX.snapTo(x);
-      cursorY.snapTo(y);
+    // The logical caret remains on legal text insertion positions while its
+    // visual representation follows with a short non-linear spring.
+    function trackCursor(pageX, pageY, acquireGesture, lineHint) {
+      const caret = nearestCaret(pageX, pageY, lineHint);
+      moveCursorVisualTo(caret);
+      // Acquiring a drag may happen anywhere on the text. Place the lens at
+      // that new handle immediately, then enable inertia for subsequent
+      // pointer moves; otherwise a far-away press gives the body momentum in
+      // the opposite direction before the user's actual drag even begins.
+      moveLensToCaret(caret.x, caret.y, !!acquireGesture);
+      return caret;
     }
 
+    function setEditorSelection(caret, shouldFocus) {
+      const hadSelection = editorSelectionEnd > editorSelectionStart;
+      if (shouldFocus && document.activeElement !== editor) {
+        try { editor.focus({ preventScroll: true }); } catch (e) { editor.focus(); }
+      }
+      try { editor.setSelectionRange(caret.textIndex, caret.textIndex); } catch (e) {}
+      editorSelectionStart = caret.textIndex;
+      editorSelectionEnd = caret.textIndex;
+      editorSelectionDirection = 'none';
+      if (hadSelection) renderCard();
+    }
+
+    function updateEditorSelectionState() {
+      editorSelectionStart = editor.selectionStart || 0;
+      editorSelectionEnd = editor.selectionEnd || 0;
+      editorSelectionDirection = editor.selectionDirection || 'none';
+    }
+
+    function editorCaretIndex() {
+      return editorSelectionDirection === 'backward' ? editorSelectionStart : editorSelectionEnd;
+    }
+
+    function syncCaretFromEditor() {
+      if (document.activeElement !== editor) return;
+      const textIndex = editorCaretIndex();
+      let caret = caretForTextIndex(textIndex);
+      if (ensureCaretVisible(caret.lineIndex)) caret = caretForTextIndex(textIndex);
+      settleCursorAt(caret);
+    }
+
+    const onSelectionChange = () => {
+      if (!dragging && document.activeElement === editor) {
+        updateEditorSelectionState();
+        renderCard();
+        syncCaretFromEditor();
+      }
+    };
+    editor.addEventListener('focus', () => {
+      editorFocused = true;
+      updateEditorSelectionState();
+      renderCard();
+      if (!dragging) syncCaretFromEditor();
+    });
+    editor.addEventListener('blur', () => {
+      editorFocused = false;
+      renderCard();
+    });
+    editor.addEventListener('input', () => {
+      textValue = editor.value;
+      updateEditorSelectionState();
+      renderCard();
+      syncCaretFromEditor();
+    });
+    editor.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape') editor.blur();
+    });
+    document.addEventListener('selectionchange', onSelectionChange);
+
+    let cursorWasMoving = false;
+    let cursorTrackScaleX = 1, cursorTrackScaleY = 1;
     function apply() {
       const ox = cursorX.value, oy = cursorY.value;
-      cursorEl.style.transform = 'translate(' + ox.toFixed(1) + 'px,' + oy.toFixed(1) + 'px)';
-      // 透镜水平居中对齐光标中心，底部与光标顶部保留间距
-      lensEl.style.transform = 'translate(' + (ox + cursorW / 2 - 64).toFixed(1) + 'px,' + (oy - LENS_GAP - 96).toFixed(1) + 'px)';
+      const cursorMoving = !reducedMotion && (cursorX.running || cursorY.running);
+      const horizontalEnergy = cursorMoving ? clamp(Math.abs(cursorX.velocity) / 900, 0, 1) : 0;
+      const verticalEnergy = cursorMoving ? clamp(Math.abs(cursorY.velocity) / 900, 0, 1) : 0;
+      cursorTrackScaleX = 1 + horizontalEnergy * 0.48;
+      cursorTrackScaleY = clamp(1 + verticalEnergy * 0.28 - horizontalEnergy * 0.16, 0.84, 1.28);
+      cursorEl.style.transform =
+        'translate(' + ox.toFixed(2) + 'px,' + oy.toFixed(2) + 'px)' +
+        ' scale(' + cursorTrackScaleX.toFixed(4) + ',' + cursorTrackScaleY.toFixed(4) + ')';
+      if (cursorMoving) {
+        cursorEl.classList.add('mag-cursor-moving');
+      } else {
+        cursorEl.classList.remove('mag-cursor-moving');
+        if (cursorWasMoving) restartCaretBlink();
+      }
+      cursorWasMoving = cursorMoving;
+
+      if (reducedMotion) {
+        lensEl.style.transform = 'translate(' + lensX.value.toFixed(1) + 'px,' + lensY.value.toFixed(1) + 'px)';
+        return;
+      }
+
+      const p = clamp(lensPress.value, 0, 1);
+      const pressScale = lerp(1, 1.055, p);
+      // Signed velocity is important. Moving left squashes the body on X;
+      // when the spring reverses, the positive velocity stretches it again.
+      // The perpendicular response approximately preserves the droplet's
+      // visual volume and keeps the shape soft instead of mechanically scaled.
+      const strainX = clamp(lensX.velocity / 1700, -0.18, 0.18);
+      const strainY = clamp(lensY.velocity / 1500, -0.16, 0.16);
+      const scaleX = pressScale * clamp(1 + strainX - strainY * 0.28, 0.78, 1.24);
+      const scaleY = pressScale * clamp(1 + strainY - strainX * 0.28, 0.80, 1.22);
+      lensEl.style.transform =
+        'translate(' + lensX.value.toFixed(2) + 'px,' + lensY.value.toFixed(2) + 'px)' +
+        ' scale(' + scaleX.toFixed(4) + ',' + scaleY.toFixed(4) + ')';
     }
     cursorX.onChange = apply;
     cursorY.onChange = apply;
+    lensX.onChange = apply;
+    lensY.onChange = apply;
+    lensPress.onChange = apply;
     apply();
 
     let dragging = false;
     let dragPoint = { x: 40, y: 200 };
+    let dragVelocity = { x: 0, y: 0 };
+    let lastPointerSample = null;
+    let activeCaret = null;
     page.addEventListener('pointerdown', (ev) => {
       const pr = content.getBoundingClientRect();
+      const point = { x: ev.clientX - pr.left, y: ev.clientY - pr.top };
+      const insideCard = point.x >= cardLeft && point.x <= cardLeft + cardW &&
+        point.y >= cardTop && point.y <= cardTop + cardH;
+      if (!insideCard) {
+        if (document.activeElement === editor) editor.blur();
+        return;
+      }
       dragging = true;
-      dragPoint = { x: ev.clientX - pr.left, y: ev.clientY - pr.top };
-      moveCursorFreely(dragPoint.x, dragPoint.y);
+      dragVelocity = { x: 0, y: 0 };
+      lastPointerSample = { x: ev.clientX, y: ev.clientY, time: ev.timeStamp || performance.now() };
+      if (reducedMotion) lensPress.snapTo(1);
+      else lensPress.animateTo(1);
+      dragPoint = point;
+      activeCaret = trackCursor(dragPoint.x, dragPoint.y, true, null);
+      setEditorSelection(activeCaret, true);
       try { page.setPointerCapture(ev.pointerId); } catch (e) {}
       ev.preventDefault();
     });
     page.addEventListener('pointermove', (ev) => {
       if (!dragging) return;
       const pr = content.getBoundingClientRect();
+      const time = ev.timeStamp || performance.now();
+      if (lastPointerSample) {
+        const dt = clamp((time - lastPointerSample.time) / 1000, 1 / 240, 0.05);
+        const rawVX = (ev.clientX - lastPointerSample.x) / dt;
+        const rawVY = (ev.clientY - lastPointerSample.y) / dt;
+        // Filtering pointer deltas avoids one coalesced browser event turning
+        // into an implausibly violent release impulse.
+        dragVelocity.x = lerp(dragVelocity.x, rawVX, 0.42);
+        dragVelocity.y = lerp(dragVelocity.y, rawVY, 0.42);
+      }
+      lastPointerSample = { x: ev.clientX, y: ev.clientY, time };
       dragPoint = { x: ev.clientX - pr.left, y: ev.clientY - pr.top };
-      moveCursorFreely(dragPoint.x, dragPoint.y);
+      activeCaret = trackCursor(
+        dragPoint.x,
+        dragPoint.y,
+        false,
+        activeCaret ? activeCaret.lineIndex : null
+      );
+      setEditorSelection(activeCaret, false);
     });
-    const up = () => {
+    const up = (ev) => {
       if (!dragging) return;
       dragging = false;
-      moveCursorTo(dragPoint.x, dragPoint.y);
+      if (reducedMotion) lensPress.snapTo(0);
+      else lensPress.animateTo(0);
+
+      if (!reducedMotion && ev.type !== 'pointercancel' && lastPointerSample) {
+        const age = Math.max(0, (ev.timeStamp || performance.now()) - lastPointerSample.time);
+        const freshness = clamp(1 - age / 140, 0, 1);
+        if (freshness > 0) {
+          // Hand a restrained amount of pointer momentum to the spring. It
+          // carries the droplet past the release point; the existing target
+          // then pulls it back and creates the requested rubber-band reversal.
+          lensX.velocity = clamp(lensX.velocity * 0.65 + dragVelocity.x * 0.35 * freshness, -1350, 1350);
+          lensY.velocity = clamp(lensY.velocity * 0.65 + dragVelocity.y * 0.35 * freshness, -1250, 1250);
+        }
+      }
+      lastPointerSample = null;
+      if (!activeCaret) activeCaret = nearestCaret(dragPoint.x, dragPoint.y, null);
+      setEditorSelection(activeCaret, true);
+      settleCursorAt(activeCaret);
+      activeCaret = null;
     };
     page.addEventListener('pointerup', up);
     page.addEventListener('pointercancel', up);
 
-    const update = () => {
+    page.addEventListener('wheel', (ev) => {
       const pr = content.getBoundingClientRect();
-      const lr = lensEl.getBoundingClientRect();
+      const x = ev.clientX - pr.left, y = ev.clientY - pr.top;
+      if (x < cardLeft || x > cardLeft + cardW || y < cardTop || y > cardTop + cardH) return;
+      const maxScroll = Math.max(0, textLines.length - visibleLineCount());
+      if (maxScroll <= 0) return;
+      const previous = scrollLine;
+      scrollLine = clamp(scrollLine + Math.sign(ev.deltaY) * 3, 0, maxScroll);
+      if (scrollLine !== previous) {
+        renderCard();
+        syncCaretFromEditor();
+      }
+      ev.preventDefault();
+    }, { passive: false });
+
+    const update = () => {
       const ox = cursorX.value, oy = cursorY.value;
-      const relX = lr.left - pr.left, relY = lr.top - pr.top;
+      // Use the unscaled physics origin, not getBoundingClientRect(): the
+      // latter includes squash/stretch and would make the sampled text swim.
+      const relX = lensX.value, relY = lensY.value;
+      const focusShiftX = ox + cursorW * 0.5 - relX - LENS_W * 0.5;
+      const focusShiftY = oy + cursorH * 0.5 - relY - LENS_H * 0.5;
+      const p = reducedMotion ? 0 : clamp(lensPress.value, 0, 1);
+      const speed = reducedMotion ? 0 : clamp(Math.hypot(lensX.velocity, lensY.velocity) / 1800, 0, 1);
       lensGlass.render({
-        refractionHeight: 8,
-        refractionAmount: 24,
+        refractionHeight: 8 + 3 * p + 3 * speed,
+        refractionAmount: 24 + 6 * p + 5 * speed,
         depthEffect: true,
         chromaticAberration: true,
-        innerShadow: { radius: 16, offsetX: 0, offsetY: 0, color: [0, 0, 0, 0.3], alpha: 1 },
+        innerShadow: { radius: 16 + 3 * p, offsetX: 0, offsetY: 0, color: [0, 0, 0, 0.3], alpha: 1 },
+        highlight: { style: 'default', width: 0.6, blurRadius: 0.3, alpha: 0.55 + 0.4 * p, angle: 45, falloff: 1 },
+        shadow: { radius: 18, offsetX: 0, offsetY: 5, color: [0, 0, 0, 0.12], alpha: 0.65 + 0.35 * p },
+        surfaceColor: [1, 1, 1, 0.018 + 0.018 * p],
         contentZoom: 1.5,
-        // 采样中心 = 透镜中心 + 76px（即光标中心所在处，透镜与光标留 16px 间距）
-        contentShift: [0, 76],
+        // The focus follows the caret even while the physical lens trails it.
+        contentShift: [focusShiftX, focusShiftY],
         tracks: [
-          { canvas: card, version: 1, rect: [24 - relX, 24 - relY, cardW, cardH], scaleX: 1, scaleY: 1 },
-          { canvas: cursor, version: 1, rect: [ox - relX, oy - relY, cursorW, cursorH], scaleX: 1, scaleY: 1 }
+          { canvas: card, version: cardVersion, rect: [cardLeft - relX, cardTop - relY, cardW, cardH], scaleX: 1, scaleY: 1 },
+          {
+            canvas: cursor,
+            version: 1,
+            rect: [ox - relX, oy - relY, cursorW, cursorH],
+            scaleX: cursorTrackScaleX,
+            scaleY: cursorTrackScaleY
+          }
         ]
       });
     };
+
+    const onMagnifierResize = () => {
+      updateCardGeometry();
+      renderCard();
+      const textIndex = editorCaretIndex();
+      let caret = caretForTextIndex(textIndex);
+      if (ensureCaretVisible(caret.lineIndex)) caret = caretForTextIndex(textIndex);
+      cursorX.snapTo(caret.x);
+      cursorY.snapTo(caret.y);
+      cursorTrackScaleX = 1;
+      cursorTrackScaleY = 1;
+      moveLensToCaret(caret.x, caret.y, true);
+    };
+    window.addEventListener('resize', onMagnifierResize);
     updaters.add(update);
     ensureUpdaterLoop();
-    content._dispose = () => { updaters.delete(update); lensGlass.dispose(); };
+    content._dispose = () => {
+      updaters.delete(update);
+      window.removeEventListener('resize', onMagnifierResize);
+      document.removeEventListener('selectionchange', onSelectionChange);
+      cursorX.snapTo(cursorX.value); cursorY.snapTo(cursorY.value);
+      lensX.snapTo(lensX.value); lensY.snapTo(lensY.value); lensPress.snapTo(lensPress.value);
+      lensGlass.dispose();
+    };
   }
 
   /* =================== Glass Playground =================== */

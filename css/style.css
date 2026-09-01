@@ -426,8 +426,21 @@ html, body {
 .cc-spacer { width: 100%; }
 
 /* ---- magnifier ---- */
-.mag-page { position: absolute; inset: 0; touch-action: none; }
+.mag-page { position: absolute; inset: 0; touch-action: none; cursor: grab; }
+.mag-page:active { cursor: grabbing; }
 .mag-text { position: absolute; left: 24px; top: 24px; }
+.mag-editor-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  left: 0;
+  top: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  resize: none;
+}
 .mag-cursor {
   position: absolute;
   left: 0; top: 0;
@@ -436,13 +449,25 @@ html, body {
   z-index: 3;
 }
 .mag-cursor-blink { animation: mag-caret-blink 1.05s steps(1, end) infinite; }
+.mag-cursor-moving {
+  animation: none !important;
+  opacity: 1 !important;
+}
 @keyframes mag-caret-blink {
   0%, 46% { opacity: 1; }
   47%, 76% { opacity: 0; }
   77%, 100% { opacity: 1; }
 }
 .mag-cursor canvas { width: 4px; height: 24px; display: block; }
-.mag-lens { position: absolute; left: 0; top: 0; width: 128px; height: 96px; will-change: transform; z-index: 2; }
+.mag-lens {
+  position: absolute;
+  left: 0; top: 0;
+  width: 128px; height: 96px;
+  transform-origin: 64px 48px;
+  will-change: transform;
+  pointer-events: none;
+  z-index: 2;
+}
 
 /* ---- glass playground ---- */
 .pg-main {
